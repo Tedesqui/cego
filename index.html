@@ -22,9 +22,9 @@
             background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0));
             text-align: center;
         }
-        /* Botão principal adaptado para a nova função */
+        /* Botão principal (Ouvir Descrição) */
         button#captureBtn {
-            background-color: #4CAF50; /* Nova cor para destaque (verde) */
+            background-color: #4CAF50; 
             color: white; padding: 15px 30px; border: none;
             border-radius: 50px; font-size: 18px; font-weight: 700; cursor: pointer;
             transition: all 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
@@ -32,7 +32,7 @@
         button#captureBtn:hover:not(:disabled) { background-color: #45a049; transform: translateY(-2px); }
         button:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
         
-        /* Ocultando inputs opcionais (não mais necessários para cegos) */
+        /* Ocultando inputs opcionais */
         #optional-inputs { display: none; }
 
         #output-panel {
@@ -80,15 +80,15 @@
         const controlsDiv = document.getElementById("controls");
         const captureBtn = document.getElementById("captureBtn");
         
-        // --- NOVIDADE: FUNÇÃO TEXT-TO-SPEECH (TTS) ---
+        // --- FUNÇÃO TEXT-TO-SPEECH (TTS) ---
         function speakText(text) {
             if ('speechSynthesis' in window) {
                 // Cancelar qualquer fala anterior
                 window.speechSynthesis.cancel(); 
                 
                 const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'pt-BR'; // Define o idioma para Português do Brasil
-                utterance.rate = 1.0; // Velocidade de fala padrão
+                utterance.lang = 'pt-BR'; 
+                utterance.rate = 1.0; 
                 
                 // Dispara a narração
                 window.speechSynthesis.speak(utterance);
@@ -109,7 +109,6 @@
                 }); 
                 video.srcObject = stream; 
             } catch (err) { 
-                // Narra o erro da câmera
                 speakText("Erro ao acessar a câmera. Por favor, verifique as permissões.");
                 alert("Erro ao acessar a câmera."); 
             } 
@@ -126,7 +125,6 @@
         captureBtn.addEventListener('click', async () => {
             captureBtn.disabled = true;
             
-            // Cancela a fala anterior para evitar sobreposição
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
             }
@@ -141,21 +139,18 @@
             canvas.style.display = 'block';
             controlsDiv.style.display = 'none';
 
-            // Mensagem de status inicial narrada
             const statusText = "Analisando a cena. Por favor, aguarde alguns segundos.";
             outputPanel.innerHTML = `<div class="status-text">🔎 ${statusText}</div>`;
             outputPanel.style.display = 'block';
-            speakText(statusText); // Narra o status
+            speakText(statusText); 
 
             try {
                 const imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
                 
-                // --- O campo 'contexto' não é mais capturado nem enviado ---
-                
-                const response = await fetch('/api/identify-environment', { // <-- Endpoint alterado
+                const response = await fetch('/api/identify-environment', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: imageDataUrl }), // <-- Apenas a imagem é enviada
+                    body: JSON.stringify({ image: imageDataUrl }), 
                 });
 
                 if (!response.ok) {
@@ -168,14 +163,13 @@
             } catch (error) {
                 const errorMessage = "Ocorreu um erro na análise. Por favor, tente novamente.";
                 outputPanel.innerHTML = `<div class="status-text" style="color:red;">❌ ${errorMessage}</div>`;
-                speakText(errorMessage); // Narra o erro
+                speakText(errorMessage); 
                 setTimeout(resetUI, 4000);
             }
         });
 
-        // --- FUNÇÃO DE RENDERIZAÇÃO E NARRAÇÃO ADAPTADA ---
+        // --- FUNÇÃO DE RENDERIZAÇÃO E NARRAÇÃO COM NOVO BOTÃO ---
         function renderIdentification(data) {
-            // Espera-se que o backend retorne { "description": "Texto narrável" }
             const description = data.description;
             
             if (!description || description.trim() === "") {
@@ -186,7 +180,7 @@
                 return;
             }
 
-            // 1. Narração do Texto (O MAIS IMPORTANTE)
+            // 1. Narração do Texto
             speakText(description); 
 
             // 2. Exibição na Tela (Para quem enxerga)
@@ -197,9 +191,30 @@
                 </div>
             `;
             
-            // 3. Botão de Tentar Novamente
-            const retryButtonHTML = `<div style="padding: 20px;"><button onclick="resetUI()" id="captureBtn" style="width:100%;">Tirar Nova Foto</button></div>`;
-            outputPanel.innerHTML = html + retryButtonHTML;
+            // 3. NOVO BOTÃO: REPETIR A DESCRIÇÃO
+            // Usamos .replace(/'/g, "\\'") para escapar aspas simples dentro da string de descrição,
+            // garantindo que o JavaScript no onclick não quebre.
+            const repeatButtonHTML = `
+                <div style="padding: 5px 20px 5px 20px;">
+                    <button onclick="speakText('${description.replace(/'/g, "\\'")}')" 
+                            style="width:100%; padding: 10px 0; background-color: #0ba3f5; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: background-color 0.2s;">
+                        Fazer a Descrição Novamente
+                    </button>
+                </div>
+            `;
+
+            // 4. Botão de Tentar Novamente
+            const retryButtonHTML = `
+                <div style="padding: 5px 20px 20px 20px;">
+                    <button onclick="resetUI()" 
+                            style="width:100%; padding: 10px 0; background-color: #4CAF50; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: background-color 0.2s;">
+                        Tirar Nova Foto / Novo Ambiente
+                    </button>
+                </div>
+            `;
+            
+            // 5. Renderizando tudo: Descrição + Repetir + Novo Ambiente
+            outputPanel.innerHTML = html + repeatButtonHTML + retryButtonHTML;
         }
 
         startCamera();
