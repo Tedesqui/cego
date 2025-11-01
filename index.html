@@ -192,22 +192,22 @@
             `;
             
             // 3. NOVO BOTÃO: REPETIR A DESCRIÇÃO
-            // Usamos .replace(/'/g, "\\'") para escapar aspas simples dentro da string de descrição,
-            // garantindo que o JavaScript no onclick não quebre.
+            // AUMENTO DA ALTURA: padding: 10px 0; -> padding: 15px 0;
             const repeatButtonHTML = `
                 <div style="padding: 5px 20px 5px 20px;">
                     <button onclick="speakText('${description.replace(/'/g, "\\'")}')" 
-                            style="width:100%; padding: 10px 0; background-color: #0ba3f5; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: background-color 0.2s;">
+                            style="width:100%; padding: 15px 0; background-color: #0ba3f5; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: background-color 0.2s;">
                         Fazer a Descrição Novamente
                     </button>
                 </div>
             `;
 
             // 4. Botão de Tentar Novamente
+            // AUMENTO DA ALTURA: padding: 10px 0; -> padding: 15px 0;
             const retryButtonHTML = `
                 <div style="padding: 5px 20px 20px 20px;">
                     <button onclick="resetUI()" 
-                            style="width:100%; padding: 10px 0; background-color: #4CAF50; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: background-color 0.2s;">
+                            style="width:100%; padding: 15px 0; background-color: #4CAF50; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: background-color 0.2s;">
                         Tirar Nova Foto / Novo Ambiente
                     </button>
                 </div>
