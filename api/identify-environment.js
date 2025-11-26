@@ -25,7 +25,7 @@ export default async function handler(request, response) {
         Siga as seguintes instruções rigorosamente:
         1.  **Natureza do Ambiente:** Descreva a **natureza do ambiente** (ex: "sala de estar bem iluminada", "rua movimentada com carros", "cozinha industrial escura").
         2.  **Objetos Chave e Posição:** Identifique **objetos proeminentes** e sua **posição relativa** (ex: "Há uma cadeira vermelha à direita e um armário grande à frente"). Use termos como 'à frente', 'à direita', 'no chão', 'na parede'.
-        3.  **Ação/Alerta:** Mencione algo que represente um **obstáculo** ou **alerta** (ex: degrau, buraco, escada, pessoa vindo em direção). Se não houver, diga "Não há obstáculos aparentes."
+        3.  **Ação/Alerta:** Mencione algo que represente um **obstáculo** ou **alerta** (ex: degrau, buraco, escada, pessoa vindo em direção).
         4.  **Formato de Resposta:** A resposta deve ser uma única e fluida descrição pronta para ser lida em voz alta.
         5.  **Idioma:** A resposta deve ser em **Português do Brasil (pt-BR)**.
 
