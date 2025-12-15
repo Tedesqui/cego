@@ -80,17 +80,20 @@
         const controlsDiv = document.getElementById("controls");
         const captureBtn = document.getElementById("captureBtn");
         
-        // --- FUNÇÃO TEXT-TO-SPEECH (TTS) ---
+        // --- FUNÇÃO TEXT-TO-SPEECH (TTS) HÍBRIDA ---
         function speakText(text) {
-            if ('speechSynthesis' in window) {
-                // Cancelar qualquer fala anterior
+            // 1. Tenta usar a Interface do Android (Voz Nativa do App)
+            if (window.Android && window.Android.falar) {
+                window.Android.falar(text);
+            }
+            // 2. Fallback: Se não for o App (ex: PC/iPhone), usa o navegador
+            else if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel(); 
                 
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'pt-BR'; 
                 utterance.rate = 1.0; 
                 
-                // Dispara a narração
                 window.speechSynthesis.speak(utterance);
             } else {
                 console.warn('Síntese de Fala não suportada neste navegador.');
@@ -125,7 +128,8 @@
         captureBtn.addEventListener('click', async () => {
             captureBtn.disabled = true;
             
-            if ('speechSynthesis' in window) {
+            // Cancela fala anterior (apenas se for navegador, no Android o java cuida disso)
+            if ('speechSynthesis' in window && (!window.Android)) {
                 window.speechSynthesis.cancel();
             }
             
@@ -192,7 +196,6 @@
             `;
             
             // 3. NOVO BOTÃO: REPETIR A DESCRIÇÃO
-            // AUMENTO DA ALTURA: padding: 10px 0; -> padding: 15px 0;
             const repeatButtonHTML = `
                 <div style="padding: 5px 20px 5px 20px;">
                     <button onclick="speakText('${description.replace(/'/g, "\\'")}')" 
@@ -203,7 +206,6 @@
             `;
 
             // 4. Botão de Tentar Novamente
-            // AUMENTO DA ALTURA: padding: 10px 0; -> padding: 15px 0;
             const retryButtonHTML = `
                 <div style="padding: 5px 20px 20px 20px;">
                     <button onclick="resetUI()" 
