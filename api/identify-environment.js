@@ -5,40 +5,45 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Presume-se que este handler está configurado para a rota /api/identify-environment
 export default async function handler(request, response) {
     try {
         if (request.method !== 'POST') {
             return response.status(405).json({ error: 'Method Not Allowed' });
         }
 
-        // --- ADAPTAÇÃO: Removemos a variável 'contexto' ---
         const { image } = request.body;
         if (!image) {
             return response.status(400).json({ error: 'A imagem é obrigatória.' });
         }
 
-        // --- NOVO PROMPT: Foco em Acessibilidade e Descrição de Ambiente ---
+        // --- PROMPT DE EQUILÍBRIO: DESCRIÇÃO RICA + NAVEGAÇÃO ---
         let promptText = `
-        Você é um **Assistente de Acessibilidade Visual**. Seu papel é analisar a imagem de uma câmera (ambiente interno ou externo) e **descrever a cena** de forma clara, concisa e útil para uma pessoa cega.
+        Você é um **Assistente de Visão Artificial Avançado** para pessoas cegas.
+        Sua função é fornecer uma **descrição detalhada e imersiva do ambiente**, mas mantendo total consciência sobre a **navegação e segurança**.
 
-        Siga as seguintes instruções rigorosamente:
-        1.  **Natureza do Ambiente:** Descreva a **natureza do ambiente** (ex: "sala de estar bem iluminada", "rua movimentada com carros", "cozinha industrial escura").
-        2.  **Objetos Chave e Posição:** Identifique **objetos proeminentes** e sua **posição relativa** (ex: "Há uma cadeira vermelha à direita e um armário grande à frente"). Use termos como 'à frente', 'à direita', 'no chão', 'na parede'.
-        3.  **Ação/Alerta:** Mencione algo que represente um **obstáculo** ou **alerta** (ex: degrau, buraco, escada, pessoa vindo em direção).
-        4.  **Formato de Resposta:** A resposta deve ser uma única e fluida descrição pronta para ser lida em voz alta.
-        5.  **Idioma:** A resposta deve ser em **Português do Brasil (pt-BR)**.
+        Analise a imagem e gere uma descrição em texto corrido (narrativa) seguindo esta estrutura lógica:
 
-        Responda estritamente como um único objeto JSON. O objeto deve conter uma chave **"description"**.
+        1.  **Identificação do Ambiente (Contexto):** Comece definindo onde o usuário está e a atmosfera geral (ex: "Uma sala de estar ampla e bem iluminada", "Um escritório bagunçado", "Uma calçada arborizada").
+        2.  **Detalhamento dos Objetos:** Descreva os objetos presentes, cores e materiais, para que o usuário possa visualizar a cena mentalmente.
+        3.  **Consciência Espacial e Obstáculos (CRUCIAL):**
+            * Ao descrever os objetos, **SEMPRE** informe a posição deles em relação ao usuário (à frente, à esquerda, à direita).
+            * **REGRA DE OURO:** Se um objeto (mesmo que seja um móvel comum como uma mesa ou cadeira) estiver no caminho direto à frente, você deve descrevê-lo explicitamente como algo que está na frente do usuário.
+            * *Exemplo Correto:* "Há uma mesa de madeira escura logo à sua frente, ocupando o centro do caminho."
+            * *Exemplo Errado:* "Caminho livre. Há uma mesa na sala." (Isso é proibido se a mesa estiver na frente).
 
+        **Objetivo:** O usuário deve ser capaz de imaginar a beleza/feura do local E saber se pode andar para frente sem bater em nada, tudo na mesma frase fluida.
+
+        **Idioma:** Português do Brasil (pt-BR).
+
+        Responda estritamente como um único objeto JSON:
         {
-          "description": "SUA DESCRIÇÃO ÚNICA E CONCISA VAI AQUI."
+          "description": "SUA DESCRIÇÃO DETALHADA AQUI."
         }
         `;
         // --- FIM DO NOVO PROMPT ---
 
         const completion = await openai.chat.completions.create({
-            model: "gpt-4o", // Modelo multimodal (texto e visão)
+            model: "gpt-4o", // O GPT-4o é essencial aqui para entender a profundidade da imagem
             response_format: { type: "json_object" },
             messages: [
                 {
@@ -49,18 +54,17 @@ export default async function handler(request, response) {
                     ],
                 },
             ],
-            max_tokens: 500, // Diminuindo o token para descrições concisas
+            max_tokens: 400, // Aumentei um pouco para permitir descrições mais ricas
+            temperature: 0.5, // Levemente criativo para descrever o ambiente, mas focado
         });
 
         const aiResultString = completion.choices[0].message.content;
         const parsedResult = JSON.parse(aiResultString);
 
-        // O resultado esperado é { "description": "..." }
         return response.status(200).json(parsedResult);
 
     } catch (error) {
         console.error('Erro geral na função da API:', error);
-        // Retorna um erro amigável para o frontend
         return response.status(500).json({ 
             error: 'Falha interna do servidor ao analisar a imagem.', 
             description: 'Não foi possível analisar a imagem devido a um erro de servidor. Tente novamente.'
