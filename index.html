@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Assistente de Visão - Tela Inteira</title>
+    <title>Assistente de Visão - Fluxo Contínuo</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap');
         
@@ -11,23 +11,20 @@
             margin: 0; padding: 0; font-family: 'Poppins', sans-serif;
             background: black; color: white; overflow: hidden;
             height: 100vh; width: 100vw;
-            /* Garante que toques rápidos não deem zoom */
-            touch-action: pan-y; 
+            touch-action: pan-y; /* Permite rolar texto verticalmente, mas captura swipe horizontal */
         }
 
-        /* Vídeo no fundo */
         video, canvas {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0;
         }
         canvas { display: none; }
 
-        /* Container dos controles */
         #ui-container {
             position: fixed; bottom: 0; left: 0; width: 100%; z-index: 10;
-            pointer-events: none; /* Deixa o toque passar através das áreas vazias */
+            pointer-events: none;
         }
 
-        /* Mensagem Flutuante de Status (Feedback do Gesto) */
+        /* Feedback Visual */
         #gesture-feedback {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: rgba(0,0,0,0.9); padding: 25px 40px; border-radius: 20px;
@@ -43,20 +40,18 @@
             pointer-events: auto;
         }
 
-        /* Botão apenas visual */
         button#captureBtn {
             background-color: #4CAF50; 
             color: white; padding: 15px 30px; border: none;
             border-radius: 50px; font-size: 18px; font-weight: 700; cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            width: 90%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 90%;
         }
         
         #output-panel {
             background: #111; padding: 20px; max-height: 80vh; overflow-y: auto;
             box-sizing: border-box; border-top: 2px solid #4CAF50; 
             pointer-events: auto; /* Permite rolar o texto */
-            padding-bottom: 40px;
+            padding-bottom: 50px;
         }
 
         .description-card {
@@ -95,7 +90,6 @@
         let lastDescription = "Nenhuma descrição disponível ainda.";
         let isProcessing = false;
 
-        // --- TTS (Fala) ---
         function speakText(text) {
             if (window.Android && window.Android.falar) {
                 window.Android.falar(text);
@@ -108,15 +102,13 @@
             }
         }
 
-        // --- Feedback ---
         function showFeedback(text) {
             feedbackBox.innerText = text;
             feedbackBox.style.display = 'block';
-            if (navigator.vibrate) navigator.vibrate(70); // Vibração um pouco mais forte
+            if (navigator.vibrate) navigator.vibrate(70);
             setTimeout(() => { feedbackBox.style.display = 'none'; }, 2000);
         }
 
-        // --- Câmera ---
         async function startCamera() { 
             try { 
                 const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -124,7 +116,7 @@
                 }); 
                 video.srcObject = stream; 
                 setTimeout(() => {
-                    speakText("Assistente pronto. Arraste para a direita em qualquer lugar para descrever.");
+                    speakText("Assistente pronto. Arraste para a direita para descrever.");
                 }, 1000);
             } catch (err) { 
                 speakText("Erro na câmera.");
@@ -137,10 +129,14 @@
             outputPanel.style.display = 'none';
             controlsDiv.style.display = 'block';
             captureBtn.disabled = false;
+            
+            // IMPORTANTE: Reseta o processamento para permitir novos gestos
             isProcessing = false;
+            
+            showFeedback("📸 Câmera Pronta");
+            speakText("Câmera pronta.");
         }
 
-        // --- ANÁLISE ---
         async function analyzeScene() {
             if (isProcessing) return;
             isProcessing = true;
@@ -163,7 +159,6 @@
 
             try {
                 const imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                
                 const response = await fetch('/api/identify-environment', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -181,6 +176,10 @@
                 speakText("Erro. Tente novamente.");
                 outputPanel.innerHTML = `<div class="status-text" style="color:red;">Erro ao analisar.</div>`;
                 setTimeout(resetUI, 3000);
+            } finally {
+                // IMPORTANTE: Liberamos o processamento aqui, mesmo com a descrição na tela
+                // Isso permite que o usuário faça o gesto para "Nova Foto"
+                isProcessing = false; 
             }
         }
 
@@ -197,11 +196,10 @@
             `;
         }
 
-        // --- GESTOS GLOBAIS (AGORA NO DOCUMENTO INTEIRO) ---
+        // --- GESTOS GLOBAIS ---
         let touchStartX = 0;
         let touchStartY = 0;
 
-        // Ouvimos o 'document' inteiro, não só uma camada
         document.addEventListener('touchstart', (e) => {
             touchStartX = e.changedTouches[0].screenX;
             touchStartY = e.changedTouches[0].screenY;
@@ -218,16 +216,23 @@
             const horizontalDist = endX - startX;
             const verticalDist = endY - startY;
 
-            // LÓGICA IMPORTANTE:
-            // Só ativamos o comando se o movimento for CLARAMENTE horizontal.
-            // Se a pessoa arrastar muito na vertical (scrolling), ignoramos para deixar ela ler o texto.
+            // Prioriza movimento horizontal
             if (Math.abs(horizontalDist) > Math.abs(verticalDist) && Math.abs(horizontalDist) > minSwipeDistance) {
                 
-                // Arraste para Direita -> Analisar
+                // ARRASTE PARA DIREITA (👉)
                 if (horizontalDist > 0) {
-                    if (!isProcessing) analyzeScene();
+                    // LÓGICA DE FLUXO:
+                    // 1. Se a caixa de texto está visível -> Reseta para Câmera
+                    if (outputPanel.style.display === 'block') {
+                        resetUI();
+                    } 
+                    // 2. Se está na Câmera -> Tira a Foto
+                    else {
+                        if (!isProcessing) analyzeScene();
+                    }
                 } 
-                // Arraste para Esquerda -> Repetir
+                
+                // ARRASTE PARA ESQUERDA (👈)
                 else {
                     showFeedback("🔄 Repetindo...");
                     speakText(lastDescription);
@@ -235,9 +240,7 @@
             }
         }
 
-        // Clique no botão também funciona
         captureBtn.addEventListener('click', analyzeScene);
-
         startCamera();
     </script>
 </body>
