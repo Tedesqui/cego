@@ -11,7 +11,7 @@
             margin: 0; padding: 0; font-family: 'Poppins', sans-serif;
             background: black; color: white; overflow: hidden;
             height: 100vh; width: 100vw;
-            touch-action: pan-y; /* Permite rolar texto verticalmente, mas captura swipe horizontal */
+            touch-action: pan-y;
         }
 
         video, canvas {
@@ -24,7 +24,6 @@
             pointer-events: none;
         }
 
-        /* Feedback Visual */
         #gesture-feedback {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: rgba(0,0,0,0.9); padding: 25px 40px; border-radius: 20px;
@@ -50,7 +49,7 @@
         #output-panel {
             background: #111; padding: 20px; max-height: 80vh; overflow-y: auto;
             box-sizing: border-box; border-top: 2px solid #4CAF50; 
-            pointer-events: auto; /* Permite rolar o texto */
+            pointer-events: auto;
             padding-bottom: 50px;
         }
 
@@ -116,7 +115,7 @@
                 }); 
                 video.srcObject = stream; 
                 setTimeout(() => {
-                    speakText("Assistente pronto. Arraste para a direita para descrever.");
+                    speakText("Assistente pronto. Arraste o dedo para a direita para descrever.");
                 }, 1000);
             } catch (err) { 
                 speakText("Erro na câmera.");
@@ -129,12 +128,11 @@
             outputPanel.style.display = 'none';
             controlsDiv.style.display = 'block';
             captureBtn.disabled = false;
-            
-            // IMPORTANTE: Reseta o processamento para permitir novos gestos
             isProcessing = false;
             
+            // --- MODIFICAÇÃO AQUI (RESET) ---
             showFeedback("📸 Câmera Pronta");
-            speakText("Câmera pronta.");
+            speakText("Câmera Pronta, arraste o dedo para a direita novamente.");
         }
 
         async function analyzeScene() {
@@ -142,8 +140,9 @@
             isProcessing = true;
             captureBtn.disabled = true;
 
-            showFeedback("👁️ Analisando...");
-            speakText("Analisando...");
+            // --- MODIFICAÇÃO AQUI (ANÁLISE) ---
+            showFeedback("👁️ Analisando Imagem...");
+            speakText("Analisando Imagem...");
 
             const MAX_WIDTH = 1024;
             const scale = MAX_WIDTH / video.videoWidth;
@@ -177,8 +176,6 @@
                 outputPanel.innerHTML = `<div class="status-text" style="color:red;">Erro ao analisar.</div>`;
                 setTimeout(resetUI, 3000);
             } finally {
-                // IMPORTANTE: Liberamos o processamento aqui, mesmo com a descrição na tela
-                // Isso permite que o usuário faça o gesto para "Nova Foto"
                 isProcessing = false; 
             }
         }
@@ -196,7 +193,7 @@
             `;
         }
 
-        // --- GESTOS GLOBAIS ---
+        // --- GESTOS ---
         let touchStartX = 0;
         let touchStartY = 0;
 
@@ -216,22 +213,16 @@
             const horizontalDist = endX - startX;
             const verticalDist = endY - startY;
 
-            // Prioriza movimento horizontal
             if (Math.abs(horizontalDist) > Math.abs(verticalDist) && Math.abs(horizontalDist) > minSwipeDistance) {
                 
                 // ARRASTE PARA DIREITA (👉)
                 if (horizontalDist > 0) {
-                    // LÓGICA DE FLUXO:
-                    // 1. Se a caixa de texto está visível -> Reseta para Câmera
                     if (outputPanel.style.display === 'block') {
                         resetUI();
-                    } 
-                    // 2. Se está na Câmera -> Tira a Foto
-                    else {
+                    } else {
                         if (!isProcessing) analyzeScene();
                     }
                 } 
-                
                 // ARRASTE PARA ESQUERDA (👈)
                 else {
                     showFeedback("🔄 Repetindo...");
