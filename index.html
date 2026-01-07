@@ -3,222 +3,203 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Assistente de Visão - Ambientes e Objetos</title>
+    <title>Assistente Visual por Gestos</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap');
         body, html {
-            margin: 0; padding: 0; font-family: 'Poppins', sans-serif;
-            background: black; color: white; overflow: hidden;
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+            background-color: #000;
+            color: white;
+            overflow: hidden; /* Impede rolagem para focar nos gestos */
+            height: 100vh;
+            width: 100vw;
         }
+
+        /* O vídeo ocupa a tela toda */
         video, canvas {
-            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
         }
+
         canvas { display: none; }
-        #ui-container {
-            position: fixed; bottom: 0; left: 0; width: 100%; z-index: 2;
+
+        /* Área de toque invisível que cobre tudo */
+        #touch-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10; /* Fica acima do vídeo */
+            /* Gradiente suave apenas para indicar que está ativo (opcional) */
+            background: linear-gradient(to bottom, rgba(0,0,0,0.3), transparent, rgba(0,0,0,0.3));
         }
-        #controls {
+
+        /* Feedback visual centralizado (opcional, para baixa visão) */
+        #status-display {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            background: rgba(0,0,0,0.8);
             padding: 20px;
-            background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0));
+            border-radius: 15px;
             text-align: center;
-        }
-        /* Botão principal (Ouvir Descrição) */
-        button#captureBtn {
-            background-color: #4CAF50; 
-            color: white; padding: 15px 30px; border: none;
-            border-radius: 50px; font-size: 18px; font-weight: 700; cursor: pointer;
-            transition: all 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        button#captureBtn:hover:not(:disabled) { background-color: #45a049; transform: translateY(-2px); }
-        button:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
-        
-        /* Ocultando inputs opcionais */
-        #optional-inputs { display: none; }
-
-        #output-panel {
-            background: #111; padding: 15px; max-height: 85vh; overflow-y: auto;
-            box-sizing: border-box; border-top: 1px solid #444;
-        }
-        .status-text { text-align: center; padding: 20px; font-size: 1.1em; }
-        
-        /* Card de identificação simplificado para descrição */
-        .description-card {
-            background: #1e1e1e; border: 1px solid #4CAF50; border-radius: 12px;
-            padding: 20px; margin-bottom: 20px;
-        }
-        .description-card h2 { margin-top: 0; color: #4CAF50; } 
-        .description-card p { padding-left: 10px; line-height: 1.6; }
-
-        @media (max-width: 600px) {
-            #optional-inputs { flex-direction: column; align-items: center; }
-            .input-group { width: 100%; max-width: none; }
+            font-size: 24px;
+            display: none; /* Só aparece quando algo acontece */
         }
     </style>
 </head>
 <body>
+
     <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
-    <div id="ui-container">
-        <div id="output-panel" style="display:none;"></div>
-        <div id="controls">
-            
-            <div id="optional-inputs">
-                <div class="input-group">
-                    <textarea id="contexto" placeholder="Contexto (Opcional)" rows="1"></textarea>
-                </div>
-            </div>
-            
-            <button id="captureBtn">🔊 Ouvir Descrição do Ambiente</button>
-        </div>
-    </div>
+
+    <div id="touch-layer"></div>
+
+    <div id="status-display"></div>
 
     <script>
         const video = document.getElementById("video");
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
-        const outputPanel = document.getElementById("output-panel");
-        const controlsDiv = document.getElementById("controls");
-        const captureBtn = document.getElementById("captureBtn");
-        
-        // --- FUNÇÃO TEXT-TO-SPEECH (TTS) HÍBRIDA ---
-        function speakText(text) {
-            // 1. Tenta usar a Interface do Android (Voz Nativa do App)
-            if (window.Android && window.Android.falar) {
-                window.Android.falar(text);
-            }
-            // 2. Fallback: Se não for o App (ex: PC/iPhone), usa o navegador
-            else if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); 
+        const statusDiv = document.getElementById("status-display");
+        const touchLayer = document.getElementById("touch-layer");
+
+        let lastDescription = "Nenhuma descrição feita ainda. Arraste para a direita para começar.";
+        let isProcessing = false;
+
+        // --- 1. CONFIGURAÇÃO DE VOZ (TTS) ---
+        function falar(texto) {
+            // Cancela falas anteriores para não encavalar
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(texto);
+            utterance.lang = 'pt-BR';
+            utterance.rate = 1.1; // Um pouco mais rápido para ser ágil
+            utterance.pitch = 1;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function mostrarStatus(texto) {
+            statusDiv.innerText = texto;
+            statusDiv.style.display = 'block';
+            setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
+        }
+
+        // --- 2. CÂMERA ---
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" }
+                });
+                video.srcObject = stream;
                 
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'pt-BR'; 
-                utterance.rate = 1.0; 
+                // Instrução inicial ao abrir o app
+                setTimeout(() => {
+                    falar("Assistente iniciado. Arraste o dedo para a direita para descrever o ambiente. Arraste para a esquerda para repetir.");
+                }, 1000);
+
+            } catch (err) {
+                falar("Erro ao acessar a câmera. Verifique as permissões.");
+            }
+        }
+
+        // --- 3. SISTEMA DE GESTOS (SWIPE) ---
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+
+        touchLayer.addEventListener('touchstart', function(event) {
+            touchStartX = event.changedTouches[0].screenX;
+            touchStartY = event.changedTouches[0].screenY;
+        }, false);
+
+        touchLayer.addEventListener('touchend', function(event) {
+            touchEndX = event.changedTouches[0].screenX;
+            touchEndY = event.changedTouches[0].screenY;
+            handleGesture();
+        }, false);
+
+        function handleGesture() {
+            const minSwipeDistance = 50; // Distância mínima para considerar um arraste
+            const horizontalDist = touchEndX - touchStartX;
+            const verticalDist = touchEndY - touchStartY;
+
+            // Verifica se o movimento foi mais horizontal que vertical
+            if (Math.abs(horizontalDist) > Math.abs(verticalDist)) {
                 
-                window.speechSynthesis.speak(utterance);
-            } else {
-                console.warn('Síntese de Fala não suportada neste navegador.');
+                // SWIPE DIREITA (Valor Positivo) -> ANALISAR
+                if (horizontalDist > minSwipeDistance) {
+                    executarAnalise();
+                }
+                
+                // SWIPE ESQUERDA (Valor Negativo) -> REPETIR
+                else if (horizontalDist < -minSwipeDistance) {
+                    repetirDescricao();
+                }
             }
         }
-        // --------------------------------------------------
 
-        async function startCamera() { 
-            try { 
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: { ideal: "environment" }, 
-                        width: { ideal: 1920 }, 
-                        height: { ideal: 1080 } 
-                    } 
-                }); 
-                video.srcObject = stream; 
-            } catch (err) { 
-                speakText("Erro ao acessar a câmera. Por favor, verifique as permissões.");
-                alert("Erro ao acessar a câmera."); 
-            } 
+        // --- 4. AÇÕES ---
+
+        function vibrar() {
+            if (navigator.vibrate) navigator.vibrate(100); // Vibração curta
         }
 
-        function resetUI() {
-            canvas.style.display = 'none';
-            video.style.display = 'block';
-            outputPanel.style.display = 'none';
-            controlsDiv.style.display = 'block';
-            captureBtn.disabled = false;
+        function repetirDescricao() {
+            vibrar();
+            mostrarStatus("🔄 Repetindo...");
+            falar(lastDescription);
         }
 
-        captureBtn.addEventListener('click', async () => {
-            captureBtn.disabled = true;
+        async function executarAnalise() {
+            if (isProcessing) return; // Evita cliques duplos
+            isProcessing = true;
             
-            // Cancela fala anterior (apenas se for navegador, no Android o java cuida disso)
-            if ('speechSynthesis' in window && (!window.Android)) {
-                window.speechSynthesis.cancel();
-            }
-            
-            const MAX_WIDTH = 1024;
-            const scale = MAX_WIDTH / video.videoWidth;
-            canvas.width = MAX_WIDTH;
-            canvas.height = video.videoHeight * scale;
+            vibrar();
+            falar("Analisando..."); // Feedback imediato
+            mostrarStatus("👁️ Analisando...");
+
+            // Captura frame
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            video.style.display = 'none';
-            canvas.style.display = 'block';
-            controlsDiv.style.display = 'none';
-
-            const statusText = "Analisando a cena. Por favor, aguarde alguns segundos.";
-            outputPanel.innerHTML = `<div class="status-text">🔎 ${statusText}</div>`;
-            outputPanel.style.display = 'block';
-            speakText(statusText); 
+            const imageDataUrl = canvas.toDataURL('image/jpeg', 0.7);
 
             try {
-                const imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                
-                const response = await fetch('/api/identify-environment', { 
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: imageDataUrl }), 
+                // Chama sua API (A mesma que configuramos antes)
+                const response = await fetch('/api/identify-environment', {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ image: imageDataUrl })
                 });
 
-                if (!response.ok) {
-                    throw new Error(`Erro na API: ${response.statusText}`);
-                }
+                if (!response.ok) throw new Error("Erro na API");
+
                 const data = await response.json();
                 
-                renderIdentification(data);
+                // Guarda e Fala
+                lastDescription = data.description;
+                falar(lastDescription);
+                mostrarStatus(lastDescription);
 
             } catch (error) {
-                const errorMessage = "Ocorreu um erro na análise. Por favor, tente novamente.";
-                outputPanel.innerHTML = `<div class="status-text" style="color:red;">❌ ${errorMessage}</div>`;
-                speakText(errorMessage); 
-                setTimeout(resetUI, 4000);
+                falar("Não consegui identificar. Tente novamente.");
+            } finally {
+                isProcessing = false;
             }
-        });
-
-        // --- FUNÇÃO DE RENDERIZAÇÃO E NARRAÇÃO COM NOVO BOTÃO ---
-        function renderIdentification(data) {
-            const description = data.description;
-            
-            if (!description || description.trim() === "") {
-                const noDescription = "Desculpe, não consegui gerar uma descrição clara desta imagem. Tente novamente.";
-                outputPanel.innerHTML = `<div class="status-text">🤔 ${noDescription}</div>`;
-                speakText(noDescription);
-                setTimeout(resetUI, 5000);
-                return;
-            }
-
-            // 1. Narração do Texto
-            speakText(description); 
-
-            // 2. Exibição na Tela (Para quem enxerga)
-            let html = `
-                <div class="description-card">
-                    <h2>Descrição do Ambiente</h2>
-                    <p>${description}</p>
-                </div>
-            `;
-            
-            // 3. NOVO BOTÃO: REPETIR A DESCRIÇÃO
-            const repeatButtonHTML = `
-                <div style="padding: 5px 20px 5px 20px;">
-                    <button onclick="speakText('${description.replace(/'/g, "\\'")}')" 
-                            style="width:100%; padding: 15px 0; background-color: #0ba3f5; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: background-color 0.2s;">
-                        Fazer a Descrição Novamente
-                    </button>
-                </div>
-            `;
-
-            // 4. Botão de Tentar Novamente
-            const retryButtonHTML = `
-                <div style="padding: 5px 20px 20px 20px;">
-                    <button onclick="resetUI()" 
-                            style="width:100%; padding: 15px 0; background-color: #4CAF50; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: background-color 0.2s;">
-                        Tirar Nova Foto / Novo Ambiente
-                    </button>
-                </div>
-            `;
-            
-            // 5. Renderizando tudo: Descrição + Repetir + Novo Ambiente
-            outputPanel.innerHTML = html + repeatButtonHTML + retryButtonHTML;
         }
 
+        // Inicia
         startCamera();
     </script>
 </body>
