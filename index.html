@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Assistente de Visão - Ambientes e Objetos</title>
+    <title>Assistente de Visão - Tela Inteira</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap');
         
@@ -11,6 +11,8 @@
             margin: 0; padding: 0; font-family: 'Poppins', sans-serif;
             background: black; color: white; overflow: hidden;
             height: 100vh; width: 100vw;
+            /* Garante que toques rápidos não deem zoom */
+            touch-action: pan-y; 
         }
 
         /* Vídeo no fundo */
@@ -19,55 +21,52 @@
         }
         canvas { display: none; }
 
-        /* Camada invisível para capturar os gestos em cima do vídeo */
-        #touch-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;
-        }
-
-        /* Container dos controles (fica acima do touch-layer) */
+        /* Container dos controles */
         #ui-container {
             position: fixed; bottom: 0; left: 0; width: 100%; z-index: 10;
-            pointer-events: none; /* Deixa passar o toque para a camada de baixo nas áreas vazias */
+            pointer-events: none; /* Deixa o toque passar através das áreas vazias */
         }
 
         /* Mensagem Flutuante de Status (Feedback do Gesto) */
         #gesture-feedback {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.85); padding: 20px 30px; border-radius: 15px;
-            font-size: 22px; text-align: center; color: #fff; z-index: 20;
-            display: none; border: 2px solid #4CAF50;
+            background: rgba(0,0,0,0.9); padding: 25px 40px; border-radius: 20px;
+            font-size: 24px; text-align: center; color: #fff; z-index: 100;
+            display: none; border: 3px solid #4CAF50; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            font-weight: bold;
         }
 
         #controls {
             padding: 20px;
             background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0));
             text-align: center;
-            pointer-events: auto; /* Reativa o clique nos botões */
+            pointer-events: auto;
         }
 
+        /* Botão apenas visual */
         button#captureBtn {
             background-color: #4CAF50; 
             color: white; padding: 15px 30px; border: none;
             border-radius: 50px; font-size: 18px; font-weight: 700; cursor: pointer;
-            transition: all 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            width: 90%; max-width: 400px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            width: 90%;
         }
-        button#captureBtn:active { transform: scale(0.95); }
-        button:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
         
         #output-panel {
-            background: #111; padding: 15px; max-height: 85vh; overflow-y: auto;
-            box-sizing: border-box; border-top: 1px solid #444; pointer-events: auto;
+            background: #111; padding: 20px; max-height: 80vh; overflow-y: auto;
+            box-sizing: border-box; border-top: 2px solid #4CAF50; 
+            pointer-events: auto; /* Permite rolar o texto */
+            padding-bottom: 40px;
         }
 
         .description-card {
-            background: #1e1e1e; border: 1px solid #4CAF50; border-radius: 12px;
+            background: #1e1e1e; border: 1px solid #333; border-radius: 12px;
             padding: 20px; margin-bottom: 20px;
         }
-        .description-card h2 { margin-top: 0; color: #4CAF50; font-size: 1.2em; } 
-        .description-card p { line-height: 1.6; font-size: 1.1em; }
+        .description-card h2 { margin-top: 0; color: #4CAF50; font-size: 1.4em; } 
+        .description-card p { line-height: 1.6; font-size: 1.2em; color: #eee; }
 
-        .status-text { text-align: center; padding: 20px; font-size: 1.1em; }
+        .status-text { text-align: center; padding: 20px; font-size: 1.3em; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -75,14 +74,12 @@
     <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
     
-    <div id="touch-layer"></div>
-
     <div id="gesture-feedback"></div>
 
     <div id="ui-container">
         <div id="output-panel" style="display:none;"></div>
         <div id="controls">
-            <button id="captureBtn">🔊 Ouvir Descrição (ou arraste 👉)</button>
+            <button id="captureBtn">Arraste 👉 para descrever</button>
         </div>
     </div>
 
@@ -94,7 +91,6 @@
         const controlsDiv = document.getElementById("controls");
         const captureBtn = document.getElementById("captureBtn");
         const feedbackBox = document.getElementById("gesture-feedback");
-        const touchLayer = document.getElementById("touch-layer");
 
         let lastDescription = "Nenhuma descrição disponível ainda.";
         let isProcessing = false;
@@ -112,18 +108,12 @@
             }
         }
 
-        // --- Feedback Visual e Tátil ---
+        // --- Feedback ---
         function showFeedback(text) {
             feedbackBox.innerText = text;
             feedbackBox.style.display = 'block';
-            
-            // Vibrar (se permitido no AndroidManifest)
-            if (navigator.vibrate) navigator.vibrate(50);
-
-            // Esconde após 2 segundos
-            setTimeout(() => {
-                feedbackBox.style.display = 'none';
-            }, 2000);
+            if (navigator.vibrate) navigator.vibrate(70); // Vibração um pouco mais forte
+            setTimeout(() => { feedbackBox.style.display = 'none'; }, 2000);
         }
 
         // --- Câmera ---
@@ -133,9 +123,8 @@
                     video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } 
                 }); 
                 video.srcObject = stream; 
-                
                 setTimeout(() => {
-                    speakText("Assistente pronto. Arraste para a direita para descrever. Arraste para a esquerda para repetir.");
+                    speakText("Assistente pronto. Arraste para a direita em qualquer lugar para descrever.");
                 }, 1000);
             } catch (err) { 
                 speakText("Erro na câmera.");
@@ -151,7 +140,7 @@
             isProcessing = false;
         }
 
-        // --- LÓGICA DE ANÁLISE (Separada para ser usada pelo Botão E pelo Gesto) ---
+        // --- ANÁLISE ---
         async function analyzeScene() {
             if (isProcessing) return;
             isProcessing = true;
@@ -160,14 +149,12 @@
             showFeedback("👁️ Analisando...");
             speakText("Analisando...");
 
-            // Captura
             const MAX_WIDTH = 1024;
             const scale = MAX_WIDTH / video.videoWidth;
             canvas.width = MAX_WIDTH;
             canvas.height = video.videoHeight * scale;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // UI Update
             video.style.display = 'none';
             canvas.style.display = 'block';
             controlsDiv.style.display = 'none';
@@ -186,62 +173,61 @@
                 if (!response.ok) throw new Error("Erro na API");
                 const data = await response.json();
                 
-                // Salva o resultado
-                lastDescription = data.description || "Não consegui descrever.";
-                
-                // Exibe e Fala
+                lastDescription = data.description || "Sem descrição.";
                 renderResult(lastDescription);
                 speakText(lastDescription);
 
             } catch (error) {
-                speakText("Erro na análise. Tente novamente.");
+                speakText("Erro. Tente novamente.");
                 outputPanel.innerHTML = `<div class="status-text" style="color:red;">Erro ao analisar.</div>`;
                 setTimeout(resetUI, 3000);
             }
         }
 
         function renderResult(text) {
-            // Mostra o card com botão de voltar
             outputPanel.innerHTML = `
                 <div class="description-card">
                     <h2>Descrição</h2>
                     <p>${text}</p>
                 </div>
-                <button onclick="speakText(lastDescription)" style="width:100%; padding:15px; margin-bottom:10px; background:#0ba3f5; border:none; border-radius:8px; color:white; font-size:16px;">🔊 Repetir (ou arraste 👈)</button>
-                <button onclick="resetUI()" style="width:100%; padding:15px; background:#4CAF50; border:none; border-radius:8px; color:white; font-size:16px;">📸 Nova Foto (ou arraste 👉)</button>
+                <div style="text-align: center; color: #999; margin-top: 20px;">
+                    Arraste 👈 para repetir<br>
+                    Arraste 👉 para nova foto
+                </div>
             `;
         }
 
-        // --- GESTOS (SWIPE) ---
+        // --- GESTOS GLOBAIS (AGORA NO DOCUMENTO INTEIRO) ---
         let touchStartX = 0;
         let touchStartY = 0;
 
-        // Detecta quando o dedo toca a tela
-        touchLayer.addEventListener('touchstart', (e) => {
+        // Ouvimos o 'document' inteiro, não só uma camada
+        document.addEventListener('touchstart', (e) => {
             touchStartX = e.changedTouches[0].screenX;
             touchStartY = e.changedTouches[0].screenY;
         }, {passive: false});
 
-        // Detecta quando o dedo solta a tela
-        touchLayer.addEventListener('touchend', (e) => {
+        document.addEventListener('touchend', (e) => {
             const touchEndX = e.changedTouches[0].screenX;
             const touchEndY = e.changedTouches[0].screenY;
             handleGesture(touchStartX, touchEndX, touchStartY, touchEndY);
         }, {passive: false});
 
         function handleGesture(startX, endX, startY, endY) {
-            const minSwipeDistance = 60; // Distância mínima para contar como arraste
+            const minSwipeDistance = 60; 
             const horizontalDist = endX - startX;
             const verticalDist = endY - startY;
 
-            // Só aceita se for movimento horizontal (não scroll vertical)
+            // LÓGICA IMPORTANTE:
+            // Só ativamos o comando se o movimento for CLARAMENTE horizontal.
+            // Se a pessoa arrastar muito na vertical (scrolling), ignoramos para deixar ela ler o texto.
             if (Math.abs(horizontalDist) > Math.abs(verticalDist) && Math.abs(horizontalDist) > minSwipeDistance) {
                 
-                // ARRASTE PARA DIREITA (Valor Positivo) -> ANALISAR
+                // Arraste para Direita -> Analisar
                 if (horizontalDist > 0) {
                     if (!isProcessing) analyzeScene();
                 } 
-                // ARRASTE PARA ESQUERDA (Valor Negativo) -> REPETIR
+                // Arraste para Esquerda -> Repetir
                 else {
                     showFeedback("🔄 Repetindo...");
                     speakText(lastDescription);
@@ -249,7 +235,7 @@
             }
         }
 
-        // Conecta o botão físico à mesma função do gesto
+        // Clique no botão também funciona
         captureBtn.addEventListener('click', analyzeScene);
 
         startCamera();
