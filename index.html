@@ -3,203 +3,255 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Assistente Visual por Gestos</title>
+    <title>Assistente de Visão - Ambientes e Objetos</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap');
+        
         body, html {
-            margin: 0;
-            padding: 0;
-            font-family: sans-serif;
-            background-color: #000;
-            color: white;
-            overflow: hidden; /* Impede rolagem para focar nos gestos */
-            height: 100vh;
-            width: 100vw;
+            margin: 0; padding: 0; font-family: 'Poppins', sans-serif;
+            background: black; color: white; overflow: hidden;
+            height: 100vh; width: 100vw;
         }
 
-        /* O vídeo ocupa a tela toda */
+        /* Vídeo no fundo */
         video, canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: 1;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0;
         }
-
         canvas { display: none; }
 
-        /* Área de toque invisível que cobre tudo */
+        /* Camada invisível para capturar os gestos em cima do vídeo */
         #touch-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 10; /* Fica acima do vídeo */
-            /* Gradiente suave apenas para indicar que está ativo (opcional) */
-            background: linear-gradient(to bottom, rgba(0,0,0,0.3), transparent, rgba(0,0,0,0.3));
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;
         }
 
-        /* Feedback visual centralizado (opcional, para baixa visão) */
-        #status-display {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 20;
-            background: rgba(0,0,0,0.8);
-            padding: 20px;
-            border-radius: 15px;
-            text-align: center;
-            font-size: 24px;
-            display: none; /* Só aparece quando algo acontece */
+        /* Container dos controles (fica acima do touch-layer) */
+        #ui-container {
+            position: fixed; bottom: 0; left: 0; width: 100%; z-index: 10;
+            pointer-events: none; /* Deixa passar o toque para a camada de baixo nas áreas vazias */
         }
+
+        /* Mensagem Flutuante de Status (Feedback do Gesto) */
+        #gesture-feedback {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85); padding: 20px 30px; border-radius: 15px;
+            font-size: 22px; text-align: center; color: #fff; z-index: 20;
+            display: none; border: 2px solid #4CAF50;
+        }
+
+        #controls {
+            padding: 20px;
+            background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0));
+            text-align: center;
+            pointer-events: auto; /* Reativa o clique nos botões */
+        }
+
+        button#captureBtn {
+            background-color: #4CAF50; 
+            color: white; padding: 15px 30px; border: none;
+            border-radius: 50px; font-size: 18px; font-weight: 700; cursor: pointer;
+            transition: all 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            width: 90%; max-width: 400px;
+        }
+        button#captureBtn:active { transform: scale(0.95); }
+        button:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
+        
+        #output-panel {
+            background: #111; padding: 15px; max-height: 85vh; overflow-y: auto;
+            box-sizing: border-box; border-top: 1px solid #444; pointer-events: auto;
+        }
+
+        .description-card {
+            background: #1e1e1e; border: 1px solid #4CAF50; border-radius: 12px;
+            padding: 20px; margin-bottom: 20px;
+        }
+        .description-card h2 { margin-top: 0; color: #4CAF50; font-size: 1.2em; } 
+        .description-card p { line-height: 1.6; font-size: 1.1em; }
+
+        .status-text { text-align: center; padding: 20px; font-size: 1.1em; }
     </style>
 </head>
 <body>
 
     <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
-
+    
     <div id="touch-layer"></div>
 
-    <div id="status-display"></div>
+    <div id="gesture-feedback"></div>
+
+    <div id="ui-container">
+        <div id="output-panel" style="display:none;"></div>
+        <div id="controls">
+            <button id="captureBtn">🔊 Ouvir Descrição (ou arraste 👉)</button>
+        </div>
+    </div>
 
     <script>
         const video = document.getElementById("video");
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
-        const statusDiv = document.getElementById("status-display");
+        const outputPanel = document.getElementById("output-panel");
+        const controlsDiv = document.getElementById("controls");
+        const captureBtn = document.getElementById("captureBtn");
+        const feedbackBox = document.getElementById("gesture-feedback");
         const touchLayer = document.getElementById("touch-layer");
 
-        let lastDescription = "Nenhuma descrição feita ainda. Arraste para a direita para começar.";
+        let lastDescription = "Nenhuma descrição disponível ainda.";
         let isProcessing = false;
 
-        // --- 1. CONFIGURAÇÃO DE VOZ (TTS) ---
-        function falar(texto) {
-            // Cancela falas anteriores para não encavalar
-            window.speechSynthesis.cancel();
-
-            const utterance = new SpeechSynthesisUtterance(texto);
-            utterance.lang = 'pt-BR';
-            utterance.rate = 1.1; // Um pouco mais rápido para ser ágil
-            utterance.pitch = 1;
-            window.speechSynthesis.speak(utterance);
-        }
-
-        function mostrarStatus(texto) {
-            statusDiv.innerText = texto;
-            statusDiv.style.display = 'block';
-            setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
-        }
-
-        // --- 2. CÂMERA ---
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment" }
-                });
-                video.srcObject = stream;
-                
-                // Instrução inicial ao abrir o app
-                setTimeout(() => {
-                    falar("Assistente iniciado. Arraste o dedo para a direita para descrever o ambiente. Arraste para a esquerda para repetir.");
-                }, 1000);
-
-            } catch (err) {
-                falar("Erro ao acessar a câmera. Verifique as permissões.");
+        // --- TTS (Fala) ---
+        function speakText(text) {
+            if (window.Android && window.Android.falar) {
+                window.Android.falar(text);
+            } else if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel(); 
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'pt-BR'; 
+                utterance.rate = 1.1; 
+                window.speechSynthesis.speak(utterance);
             }
         }
 
-        // --- 3. SISTEMA DE GESTOS (SWIPE) ---
-        let touchStartX = 0;
-        let touchStartY = 0;
-        let touchEndX = 0;
-        let touchEndY = 0;
-
-        touchLayer.addEventListener('touchstart', function(event) {
-            touchStartX = event.changedTouches[0].screenX;
-            touchStartY = event.changedTouches[0].screenY;
-        }, false);
-
-        touchLayer.addEventListener('touchend', function(event) {
-            touchEndX = event.changedTouches[0].screenX;
-            touchEndY = event.changedTouches[0].screenY;
-            handleGesture();
-        }, false);
-
-        function handleGesture() {
-            const minSwipeDistance = 50; // Distância mínima para considerar um arraste
-            const horizontalDist = touchEndX - touchStartX;
-            const verticalDist = touchEndY - touchStartY;
-
-            // Verifica se o movimento foi mais horizontal que vertical
-            if (Math.abs(horizontalDist) > Math.abs(verticalDist)) {
-                
-                // SWIPE DIREITA (Valor Positivo) -> ANALISAR
-                if (horizontalDist > minSwipeDistance) {
-                    executarAnalise();
-                }
-                
-                // SWIPE ESQUERDA (Valor Negativo) -> REPETIR
-                else if (horizontalDist < -minSwipeDistance) {
-                    repetirDescricao();
-                }
-            }
-        }
-
-        // --- 4. AÇÕES ---
-
-        function vibrar() {
-            if (navigator.vibrate) navigator.vibrate(200); // Vibração curta
-        }
-
-        function repetirDescricao() {
-            vibrar();
-            mostrarStatus("🔄 Repetindo...");
-            falar(lastDescription);
-        }
-
-        async function executarAnalise() {
-            if (isProcessing) return; // Evita cliques duplos
-            isProcessing = true;
+        // --- Feedback Visual e Tátil ---
+        function showFeedback(text) {
+            feedbackBox.innerText = text;
+            feedbackBox.style.display = 'block';
             
-            vibrar();
-            falar("Analisando..."); // Feedback imediato
-            mostrarStatus("👁️ Analisando...");
+            // Vibrar (se permitido no AndroidManifest)
+            if (navigator.vibrate) navigator.vibrate(50);
 
-            // Captura frame
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+            // Esconde após 2 segundos
+            setTimeout(() => {
+                feedbackBox.style.display = 'none';
+            }, 2000);
+        }
+
+        // --- Câmera ---
+        async function startCamera() { 
+            try { 
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } 
+                }); 
+                video.srcObject = stream; 
+                
+                setTimeout(() => {
+                    speakText("Assistente pronto. Arraste para a direita para descrever. Arraste para a esquerda para repetir.");
+                }, 1000);
+            } catch (err) { 
+                speakText("Erro na câmera.");
+            } 
+        }
+
+        function resetUI() {
+            canvas.style.display = 'none';
+            video.style.display = 'block';
+            outputPanel.style.display = 'none';
+            controlsDiv.style.display = 'block';
+            captureBtn.disabled = false;
+            isProcessing = false;
+        }
+
+        // --- LÓGICA DE ANÁLISE (Separada para ser usada pelo Botão E pelo Gesto) ---
+        async function analyzeScene() {
+            if (isProcessing) return;
+            isProcessing = true;
+            captureBtn.disabled = true;
+
+            showFeedback("👁️ Analisando...");
+            speakText("Analisando...");
+
+            // Captura
+            const MAX_WIDTH = 1024;
+            const scale = MAX_WIDTH / video.videoWidth;
+            canvas.width = MAX_WIDTH;
+            canvas.height = video.videoHeight * scale;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+            
+            // UI Update
+            video.style.display = 'none';
+            canvas.style.display = 'block';
+            controlsDiv.style.display = 'none';
+            outputPanel.style.display = 'block';
+            outputPanel.innerHTML = `<div class="status-text">Analisando imagem...</div>`;
 
             try {
-                // Chama sua API (A mesma que configuramos antes)
-                const response = await fetch('/api/identify-environment', {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ image: imageDataUrl })
+                const imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                
+                const response = await fetch('/api/identify-environment', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageDataUrl }), 
                 });
 
                 if (!response.ok) throw new Error("Erro na API");
-
                 const data = await response.json();
                 
-                // Guarda e Fala
-                lastDescription = data.description;
-                falar(lastDescription);
-                mostrarStatus(lastDescription);
+                // Salva o resultado
+                lastDescription = data.description || "Não consegui descrever.";
+                
+                // Exibe e Fala
+                renderResult(lastDescription);
+                speakText(lastDescription);
 
             } catch (error) {
-                falar("Não consegui identificar. Tente novamente.");
-            } finally {
-                isProcessing = false;
+                speakText("Erro na análise. Tente novamente.");
+                outputPanel.innerHTML = `<div class="status-text" style="color:red;">Erro ao analisar.</div>`;
+                setTimeout(resetUI, 3000);
             }
         }
 
-        // Inicia
+        function renderResult(text) {
+            // Mostra o card com botão de voltar
+            outputPanel.innerHTML = `
+                <div class="description-card">
+                    <h2>Descrição</h2>
+                    <p>${text}</p>
+                </div>
+                <button onclick="speakText(lastDescription)" style="width:100%; padding:15px; margin-bottom:10px; background:#0ba3f5; border:none; border-radius:8px; color:white; font-size:16px;">🔊 Repetir (ou arraste 👈)</button>
+                <button onclick="resetUI()" style="width:100%; padding:15px; background:#4CAF50; border:none; border-radius:8px; color:white; font-size:16px;">📸 Nova Foto (ou arraste 👉)</button>
+            `;
+        }
+
+        // --- GESTOS (SWIPE) ---
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        // Detecta quando o dedo toca a tela
+        touchLayer.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, {passive: false});
+
+        // Detecta quando o dedo solta a tela
+        touchLayer.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].screenX;
+            const touchEndY = e.changedTouches[0].screenY;
+            handleGesture(touchStartX, touchEndX, touchStartY, touchEndY);
+        }, {passive: false});
+
+        function handleGesture(startX, endX, startY, endY) {
+            const minSwipeDistance = 60; // Distância mínima para contar como arraste
+            const horizontalDist = endX - startX;
+            const verticalDist = endY - startY;
+
+            // Só aceita se for movimento horizontal (não scroll vertical)
+            if (Math.abs(horizontalDist) > Math.abs(verticalDist) && Math.abs(horizontalDist) > minSwipeDistance) {
+                
+                // ARRASTE PARA DIREITA (Valor Positivo) -> ANALISAR
+                if (horizontalDist > 0) {
+                    if (!isProcessing) analyzeScene();
+                } 
+                // ARRASTE PARA ESQUERDA (Valor Negativo) -> REPETIR
+                else {
+                    showFeedback("🔄 Repetindo...");
+                    speakText(lastDescription);
+                }
+            }
+        }
+
+        // Conecta o botão físico à mesma função do gesto
+        captureBtn.addEventListener('click', analyzeScene);
+
         startCamera();
     </script>
 </body>
