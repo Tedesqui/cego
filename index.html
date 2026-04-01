@@ -70,7 +70,7 @@
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } }); 
                 video.srcObject = stream; 
                 setTimeout(() => {
-                    speakText("Assistente pronto. Arraste para a direita para detalhes, ou dê dois toques rápidos para resumo.");
+                    speakText("Assistente pronto. Arraste para a direita para descrição completa, ou dê dois toques rápidos para resumo.");
                 }, 1000);
             } catch (err) { speakText("Erro na câmera."); } 
         }
