@@ -12,13 +12,31 @@ export default async function handler(req, res) {
     const { image } = req.body;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o", // O modelo mais moderno de visão
+      model: "gpt-4o",
+      // 1. ZERA A CRIATIVIDADE: O modelo se torna estritamente literal e analítico.
+      temperature: 0.0, 
       messages: [
+        // 2. CONTEXTO DO SISTEMA: Define as regras inquebráveis de segurança.
+        {
+          role: "system",
+          content: "Você é um assistente visual de segurança para pessoas com deficiência visual. Suas regras são absolutas: 1) É estritamente proibido alucinar, supor, deduzir ou inventar detalhes. 2) Descreva APENAS os objetos físicos e obstáculos estruturais que você tem 100% de certeza de estar vendo. 3) Se a imagem estiver muito escura, borrada ou ilegível, não tente adivinhar o ambiente. Responda APENAS a frase: 'A imagem está sem nitidez. Por favor, tente capturar novamente.'."
+        },
+        // 3. O COMANDO DO USUÁRIO: Mais focado no que importa para a locomoção.
         {
           role: "user",
           content: [
-            { type: "text", text: "Descreva este ambiente para uma pessoa cega de forma clara, curta e objetiva em português do Brasil." },
-            { type: "image_url", image_url: { url: image } }
+            { 
+              type: "text", 
+              text: "Descreva o ambiente à frente em português do Brasil. Seja claro, curto e muito objetivo. Priorize a identificação do tipo de local, paredes, portas e potenciais obstáculos no caminho." 
+            },
+            { 
+              type: "image_url", 
+              image_url: { 
+                url: image,
+                // detail: "high" força a IA a olhar a imagem em recortes menores e mais detalhados
+                detail: "high" 
+              } 
+            }
           ]
         }
       ]
