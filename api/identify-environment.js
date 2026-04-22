@@ -13,28 +13,24 @@ export default async function handler(req, res) {
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
-      // 1. ZERA A CRIATIVIDADE: O modelo se torna estritamente literal e analítico.
-      temperature: 0.0, 
+      temperature: 0.1, 
       messages: [
-        // 2. CONTEXTO DO SISTEMA: Define as regras inquebráveis de segurança.
         {
           role: "system",
-          content: "Você é um assistente visual de segurança para pessoas com deficiência visual. Suas regras são absolutas: 1) É estritamente proibido alucinar, supor, deduzir ou inventar detalhes. 2) Descreva APENAS os objetos físicos e obstáculos estruturais que você tem 100% de certeza de estar vendo. 3) Se a imagem estiver muito escura, borrada ou ilegível, não tente adivinhar o ambiente. Responda APENAS a frase: 'A imagem está sem nitidez. Por favor, tente capturar novamente.'."
+          content: "Você é um assistente de visão para cegos. A imagem pode ter ruído digital ou baixa iluminação, pois vem de um dispositivo vestível. NÃO se recuse a descrever a menos que a imagem esteja COMPLETAMENTE preta ou branca. Se houver qualquer vulto ou forma, descreva o que parece ser, mencionando que a visibilidade está reduzida."
         },
-        // 3. O COMANDO DO USUÁRIO: Mais focado no que importa para a locomoção.
         {
           role: "user",
           content: [
             { 
               type: "text", 
-              text: "Descreva o ambiente à frente em português do Brasil. Seja claro, curto e muito objetivo. Priorize a identificação do tipo de local, paredes, portas e potenciais obstáculos no caminho." 
+              text: "Descreva o ambiente à frente em português do Brasil de forma curta e objetiva. Priorize a identificação do tipo de local, paredes, portas e potenciais obstáculos no caminho." 
             },
             { 
               type: "image_url", 
               image_url: { 
                 url: image,
-                // detail: "high" força a IA a olhar a imagem em recortes menores e mais detalhados
-                detail: "high" 
+                detail: "auto" 
               } 
             }
           ]
