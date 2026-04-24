@@ -5,11 +5,17 @@ const openai = new OpenAI({
 });
 
 export default async function handler(req, res) {
-  // Ignora se não for POST
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
   try {
-    const { image } = req.body;
+    const { image, question } = req.body;
+
+    // Lógica inteligente: Define a instrução com base em haver ou não pergunta de áudio
+    let textPrompt = "Descreva o ambiente à frente em português do Brasil de forma curta e objetiva. Priorize a identificação do tipo de local, paredes, portas e potenciais obstáculos no caminho.";
+    
+    if (question && question.trim() !== "") {
+      textPrompt = `O usuário fez a seguinte pergunta sobre a imagem: "${question}". Responda APENAS à pergunta de forma direta e concisa.`;
+    }
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -22,17 +28,8 @@ export default async function handler(req, res) {
         {
           role: "user",
           content: [
-            { 
-              type: "text", 
-              text: "Descreva o ambiente à frente em português do Brasil de forma curta e objetiva. Priorize a identificação do tipo de local, paredes, portas e potenciais obstáculos no caminho." 
-            },
-            { 
-              type: "image_url", 
-              image_url: { 
-                url: image,
-                detail: "auto" 
-              } 
-            }
+            { type: "text", text: textPrompt },
+            { type: "image_url", image_url: { url: image, detail: "auto" } }
           ]
         }
       ]
@@ -40,7 +37,6 @@ export default async function handler(req, res) {
 
     const textoDaIA = response.choices[0].message.content;
     
-    // A LINHA MÁGICA: Empacota a resposta com a etiqueta "description" exata pro Android!
     res.status(200).json({ description: textoDaIA });
 
   } catch (error) {
