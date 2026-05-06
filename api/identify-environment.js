@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   try {
     const { image, question } = req.body;
 
-    let textPrompt = "Descreva o ambiente à frente em português do Brasil de forma curta e objetiva. Priorize a identificação do tipo de local, paredes, portas e potenciais obstáculos no caminho.";
+    let textPrompt = "Descreva o ambiente à frente em português do Brasil de forma curta e objetiva. Priorize a identificação do tipo de local, paredes, portas e potenciais obstáculos no caminho e SEMPRE avise se tiver pessoas no ambiente.";
     
     if (question && question.trim() !== "") {
       // PROMPT AGRESSIVO PARA FORÇAR MÚLTIPLAS RESPOSTAS
