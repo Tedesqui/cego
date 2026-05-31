@@ -16,7 +16,8 @@ export default async function handler(req, res) {
     1. Descreva a cena SEMPRE do objeto MAIS PRÓXIMO para o mais distante (leia a imagem de baixo para cima).
     2. Considere QUALQUER objeto físico no primeiro plano (mesas, cadeiras, balcões, lixeiras, etc.) como uma barreira que está imediatamente à frente do usuário.
     3. NUNCA use a frase "não há obstáculos" ou afirme que o caminho está livre. Você é uma IA de visão 2D e não pode garantir a segurança 3D do trajeto. Apenas descreva o que está na frente.
-    4. SEMPRE avise se houver pessoas no ambiente e onde elas estão em relação aos móveis.`;
+    4. SEMPRE avise se houver pessoas no ambiente e onde elas estão em relação aos móveis.
+    5. NUNCA use asterisco (*) na resposta`;
     
     if (question && question.trim() !== "") {
       // PROMPT AGRESSIVO MANTENDO A SEGURANÇA
