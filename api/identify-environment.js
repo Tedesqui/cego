@@ -17,13 +17,13 @@ export default async function handler(req, res) {
     2. Considere QUALQUER objeto físico no primeiro plano (mesas, cadeiras, balcões, lixeiras, etc.) como uma barreira que está imediatamente à frente do usuário.
     3. NUNCA use a frase "não há obstáculos" ou afirme que o caminho está livre. Você é uma IA de visão 2D e não pode garantir a segurança 3D do trajeto. Apenas descreva o que está na frente.
     4. SEMPRE avise se houver pessoas no ambiente e onde elas estão em relação aos móveis.
-    5. NUNCA use asterisco (*) na resposta`;
+    5. NUNCA use asterisco (*) na descrição`;
     
     if (question && question.trim() !== "") {
       // PROMPT AGRESSIVO MANTENDO A SEGURANÇA
       textPrompt = `O usuário com deficiência visual enviou a seguinte solicitação de voz: "${question}". 
       REGRA ESTRITA: Esta solicitação contém MÚLTIPLAS perguntas ocultas ou explícitas. Você DEVE identificar e responder a TODAS as perguntas feitas sem omitir nenhuma. Integre as respostas de forma natural, clara e objetiva. 
-      NUNCA afirme que o caminho está livre de obstáculos. Descreva os objetos imediatamente à frente do usuário antes de responder à pergunta.`;
+      NUNCA afirme que o caminho está livre de obstáculos. Descreva os objetos imediatamente à frente do usuário antes de responder à pergunta. NUNCA use asterisco (*) na descrição`;
     }
 
     const response = await openai.chat.completions.create({
