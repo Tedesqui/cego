@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       // PROMPT AGRESSIVO MANTENDO A SEGURANÇA
       textPrompt = `O usuário com deficiência visual enviou a seguinte solicitação de voz: "${question}". 
       REGRA ESTRITA: Esta solicitação contém MÚLTIPLAS perguntas ocultas ou explícitas. Você DEVE identificar e responder a TODAS as perguntas feitas sem omitir nenhuma. Integre as respostas de forma natural, clara e objetiva. 
-      NUNCA afirme que o caminho está livre de obstáculos. Descreva os objetos imediatamente à frente do usuário antes de responder à pergunta. NUNCA use asterisco (*) na descrição`;
+      NUNCA afirme que o caminho está livre de obstáculos. Descreva os objetos imediatamente à frente do usuário antes de responder à pergunta. NUNCA use asterisco (*) na resposta`;
     }
 
     const response = await openai.chat.completions.create({
