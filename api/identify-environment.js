@@ -1,8 +1,7 @@
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Inicializa o SDK do Gemini usando a variável de ambiente configurada na Vercel
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
@@ -26,30 +25,36 @@ export default async function handler(req, res) {
       NUNCA afirme que o caminho está livre de obstáculos. Descreva os objetos imediatamente à frente do usuário antes de responder à pergunta. NUNCA use asterisco (*) na resposta`;
     }
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      temperature: 0.2, 
-      messages: [
-        {
-          role: "system",
-          content: "Você é um assistente de visão estritamente focado em navegação e segurança para pessoas com deficiência visual. A imagem pode ter ruído ou baixa iluminação. NÃO se recuse a descrever a menos que a imagem esteja COMPLETAMENTE preta ou branca. Fale de forma direta, sem floreios."
-        },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: textPrompt },
-            { type: "image_url", image_url: { url: image, detail: "auto" } }
-          ]
-        }
-      ]
+    // O frontend pode enviar com o prefixo 'data:image/jpeg;base64,'. O Gemini exige apenas o dado puro.
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+    
+    const imagePart = {
+      inlineData: {
+        data: base64Data,
+        mimeType: "image/jpeg"
+      }
+    };
+
+    // Instancia o modelo configurando as instruções de sistema rígidas
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      systemInstruction: "Você é um assistente de visão estritamente focado em navegação e segurança para pessoas com deficiência visual. A imagem pode ter ruído ou baixa iluminação. NÃO se recuse a descrever a menos que a imagem esteja COMPLETAMENTE preta ou branca. Fale de forma direta, sem floreios."
     });
 
-    const textoDaIA = response.choices[0].message.content;
+    // Envia a imagem e o prompt para a IA
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: textPrompt }, imagePart] }],
+      generationConfig: {
+        temperature: 0.2, // Mantém a temperatura baixa (igual você usava no GPT-4o) para reduzir alucinações
+      }
+    });
+
+    const textoDaIA = result.response.text();
     
     res.status(200).json({ description: textoDaIA });
 
   } catch (error) {
-    console.error(error);
+    console.error("Erro na API do Gemini:", error);
     res.status(500).json({ error: error.message });
   }
 }
