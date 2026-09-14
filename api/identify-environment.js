@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Inicializa o SDK do Gemini usando a variável de ambiente configurada na Vercel
+// Puxa a sua chave de API das variáveis de ambiente da Vercel
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export default async function handler(req, res) {
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
       NUNCA afirme que o caminho está livre de obstáculos. Descreva os objetos imediatamente à frente do usuário antes de responder à pergunta. NUNCA use asterisco (*) na resposta`;
     }
 
-    // O frontend pode enviar com o prefixo 'data:image/jpeg;base64,'. O Gemini exige apenas o dado puro.
+    // O Android envia com o prefixo 'data:image/jpeg;base64,'. O Gemini exige apenas o Base64 puro.
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
     
     const imagePart = {
@@ -35,17 +35,16 @@ export default async function handler(req, res) {
       }
     };
 
-    // Instancia o modelo configurando as instruções de sistema rígidas
+    // Configura o modelo (versão Flash, que é super rápida para o seu caso de uso)
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
       systemInstruction: "Você é um assistente de visão estritamente focado em navegação e segurança para pessoas com deficiência visual. A imagem pode ter ruído ou baixa iluminação. NÃO se recuse a descrever a menos que a imagem esteja COMPLETAMENTE preta ou branca. Fale de forma direta, sem floreios."
     });
 
-    // Envia a imagem e o prompt para a IA
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: textPrompt }, imagePart] }],
       generationConfig: {
-        temperature: 0.2, // Mantém a temperatura baixa (igual você usava no GPT-4o) para reduzir alucinações
+        temperature: 0.2, // Mantemos 0.2 para evitar alucinações e manter a objetividade
       }
     });
 
@@ -54,7 +53,7 @@ export default async function handler(req, res) {
     res.status(200).json({ description: textoDaIA });
 
   } catch (error) {
-    console.error("Erro na API do Gemini:", error);
+    console.error("Erro no processamento do Gemini:", error);
     res.status(500).json({ error: error.message });
   }
 }
