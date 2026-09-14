@@ -35,16 +35,16 @@ export default async function handler(req, res) {
       }
     };
 
-    // Configura o modelo (versão Flash, que é super rápida para o seu caso de uso)
+    // CORREÇÃO AQUI: Adicionado '-latest' para garantir que a Vercel encontre a rota
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-1.5-flash-latest",
       systemInstruction: "Você é um assistente de visão estritamente focado em navegação e segurança para pessoas com deficiência visual. A imagem pode ter ruído ou baixa iluminação. NÃO se recuse a descrever a menos que a imagem esteja COMPLETAMENTE preta ou branca. Fale de forma direta, sem floreios."
     });
 
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: textPrompt }, imagePart] }],
       generationConfig: {
-        temperature: 0.2, // Mantemos 0.2 para evitar alucinações e manter a objetividade
+        temperature: 0.2,
       }
     });
 
