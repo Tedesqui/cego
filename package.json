@@ -5,6 +5,6 @@
   "description": "Backend para o Assistente de Visão - Narração de Ambientes para acessibilidade.",
   "type": "module",  
   "dependencies": {
-    "openai": "^4.0.0"
+    "@google/generative-ai": "^0.21.0"
   }
 }
